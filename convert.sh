@@ -1,0 +1,1 @@
+pandoc -t md2ssml.lua example.md
