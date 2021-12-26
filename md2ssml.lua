@@ -392,8 +392,7 @@ function HorizontalRule()
 end
 
 function LineBlock(ls)
-  return '<div style="white-space: pre-line;">' .. table.concat(ls, '\n') ..
-         '</div>'
+  return Sentence(table.concat(ls, '\n'))
 end
 
 function CodeBlock(s, attr)
@@ -409,30 +408,30 @@ function CodeBlock(s, attr)
   end
 end
 
-function BulletList(items)
+
+function ListOfItems(items)
   local buffer = {}
   for _, item in pairs(items) do
-    table.insert(buffer, "<li>" .. item .. "</li>")
+    table.insert(buffer, " " .. item .. " ")
   end
-  return "<ul>\n" .. table.concat(buffer, "\n") .. "\n</ul>"
+  return table.concat(buffer, "\n")
+end
+
+function BulletList(items)
+  return "Unordered list:\n" .. ListOfItems(items) .. "End of list.\n"
 end
 
 function OrderedList(items)
-  local buffer = {}
-  for _, item in pairs(items) do
-    table.insert(buffer, "<li>" .. item .. "</li>")
-  end
-  return "<ol>\n" .. table.concat(buffer, "\n") .. "\n</ol>"
+  return "Ordered list:\n" .. ListOfItems(items) .. "End of list.\n"
 end
 
 function DefinitionList(items)
   local buffer = {}
   for _,item in pairs(items) do
     local k, v = next(item)
-    table.insert(buffer, "<dt>" .. k .. "</dt>\n<dd>" ..
-                   table.concat(v, "</dd>\n<dd>") .. "</dd>")
+    table.insert(buffer, Sentence("The term " .. k .. " is defined as " .. table.concat(v, "or")))
   end
-  return "<dl>\n" .. table.concat(buffer, "\n") .. "\n</dl>"
+  return Para(table.concat(buffer, "\n"))
 end
 
 -- Convert pandoc alignment to something HTML can use.
