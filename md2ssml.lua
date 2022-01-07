@@ -72,7 +72,7 @@ end
 -- Helper function to convert an attributes table into
 -- a string that can be put into HTML tags.
 local function attributes(attr)
-  return " "
+  return ""
 end
 
 -- Table to store footnotes, so they can be included at the end.
@@ -96,13 +96,12 @@ function Doc(body, metadata, variables)
   end
   add(body)
   if #notes > 0 then
-    add('<ol class="footnotes">')
+    add('Footnotes')
     for _,note in pairs(notes) do
       add(note)
     end
-    add('</ol>')
   end
-  return '<speak>\n' .. table.concat(buffer,'\n') .. '\n' .. '\n</speak>'
+  return '<speak>\n' .. table.concat(buffer,'\n') .. '\n' .. '\n</speak>\n'
 end
 
 -- The functions that follow render corresponding pandoc elements.
@@ -163,11 +162,11 @@ function Code(s, attr)
 end
 
 function InlineMath(s)
-  return "\\(" .. escape(s) .. "\\)"
+  return escape(s)
 end
 
 function DisplayMath(s)
-  return "\\[" .. escape(s) .. "\\]"
+  return escape(s)
 end
 
 function Note(s)
@@ -215,10 +214,6 @@ function Sentence(s)
   return "<s>" .. s .. "</s>"
 end
 
--- lev is an integer, the header level.
-function Header(lev, s, attr)
-  return Sentence(Emph("Header " .. lev .. attributes(attr) ..  s)) .. break_strength("strong")
-end
 
 function BlockQuote(s)
   return describe_markup("blockquote", s)
@@ -234,50 +229,6 @@ end
 
 function HorizontalRule()
   return '<break time="2s">'
-end
-
-function LineBlock(ls)
-  return '<div style="white-space: pre-line;">' .. table.concat(ls, '\n') ..
-         '</div>'
-end
-
-function CodeBlock(s, attr)
-  -- If code block has class 'dot', pipe the contents through dot
-  -- and base64, and include the base64-encoded png as a data: URL.
-  if attr.class and string.match(' ' .. attr.class .. ' ',' dot ') then
-    local img = pipe("base64", {}, pipe("dot", {"-T" .. image_format}, s))
-    return '<img src="data:' .. image_mime_type .. ';base64,' .. img .. '"/>'
-  -- otherwise treat as code (one could pipe through a highlighter)
-  else
-    return "<pre><code" .. attributes(attr) .. ">" .. escape(s) ..
-           "</code></pre>"
-  end
-end
-
-function BulletList(items)
-  local buffer = {}
-  for _, item in pairs(items) do
-    table.insert(buffer, "<li>" .. item .. "</li>")
-  end
-  return "<ul>\n" .. table.concat(buffer, "\n") .. "\n</ul>"
-end
-
-function OrderedList(items)
-  local buffer = {}
-  for _, item in pairs(items) do
-    table.insert(buffer, "<li>" .. item .. "</li>")
-  end
-  return "<ol>\n" .. table.concat(buffer, "\n") .. "\n</ol>"
-end
-
-function DefinitionList(items)
-  local buffer = {}
-  for _,item in pairs(items) do
-    local k, v = next(item)
-    table.insert(buffer, "<dt>" .. k .. "</dt>\n<dd>" ..
-                   table.concat(v, "</dd>\n<dd>") .. "</dd>")
-  end
-  return "<dl>\n" .. table.concat(buffer, "\n") .. "\n</dl>"
 end
 
 -- Convert pandoc alignment to something HTML can use.
@@ -355,7 +306,7 @@ function RawBlock(format, str)
 end
 
 function Div(s, attr)
-  return "<div" .. attributes(attr) .. ">\n" .. s .. "</div>"
+  return Sentence(s..attributes(attr))
 end
 
 -- The following code will produce runtime warnings when you haven't defined
@@ -372,23 +323,9 @@ setmetatable(_G, meta)
 
 -- lev is an integer, the header level.
 function Header(lev, s, attr)
-  return Emph(Sentence("Header " .. lev .. attributes(attr) ..  s)) .. break_strength("strong")
-end
-
-function BlockQuote(s)
-  return describe_markup("blockquote", s)
-end
-
-function DoubleQuoted(s)
-  return describe_markup("quote", s)
-end
-
-function SingleQuoted(s)
-  return s
-end
-
-function HorizontalRule()
-  return '<break time="2s">'
+  return Sentence(
+    Emph("Header " .. lev .. " " .. attributes(attr) ..  s)
+  ) .. break_strength("strong")
 end
 
 function LineBlock(ls)
@@ -398,14 +335,7 @@ end
 function CodeBlock(s, attr)
   -- If code block has class 'dot', pipe the contents through dot
   -- and base64, and include the base64-encoded png as a data: URL.
-  if attr.class and string.match(' ' .. attr.class .. ' ',' dot ') then
-    local img = pipe("base64", {}, pipe("dot", {"-T" .. image_format}, s))
-    return '<img src="data:' .. image_mime_type .. ';base64,' .. img .. '"/>'
-  -- otherwise treat as code (one could pipe through a highlighter)
-  else
-    return "<pre><code" .. attributes(attr) .. ">" .. escape(s) ..
-           "</code></pre>"
-  end
+  return describe_markup("code", s) .. attributes(attr)
 end
 
 
@@ -433,93 +363,4 @@ function DefinitionList(items)
   end
   return Para(table.concat(buffer, "\n"))
 end
-
--- Convert pandoc alignment to something HTML can use.
--- align is AlignLeft, AlignRight, AlignCenter, or AlignDefault.
-function html_align(align)
-  if align == 'AlignLeft' then
-    return 'left'
-  elseif align == 'AlignRight' then
-    return 'right'
-  elseif align == 'AlignCenter' then
-    return 'center'
-  else
-    return 'left'
-  end
-end
-
-function CaptionedImage(src, title, caption, attr)
-   return '<div class="figure">\n<img src="' .. escape(src,true) ..
-      '" title="' .. escape(title,true) .. '"/>\n' ..
-      '<p class="caption">' .. caption .. '</p>\n</div>'
-end
-
--- Caption is a string, aligns is an array of strings,
--- widths is an array of floats, headers is an array of
--- strings, rows is an array of arrays of strings.
-function Table(caption, aligns, widths, headers, rows)
-  local buffer = {}
-  local function add(s)
-    table.insert(buffer, s)
-  end
-  add("<table>")
-  if caption ~= "" then
-    add("<caption>" .. caption .. "</caption>")
-  end
-  if widths and widths[1] ~= 0 then
-    for _, w in pairs(widths) do
-      add('<col width="' .. string.format("%.0f%%", w * 100) .. '" />')
-    end
-  end
-  local header_row = {}
-  local empty_header = true
-  for i, h in pairs(headers) do
-    local align = html_align(aligns[i])
-    table.insert(header_row,'<th align="' .. align .. '">' .. h .. '</th>')
-    empty_header = empty_header and h == ""
-  end
-  if empty_header then
-    head = ""
-  else
-    add('<tr class="header">')
-    for _,h in pairs(header_row) do
-      add(h)
-    end
-    add('</tr>')
-  end
-  local class = "even"
-  for _, row in pairs(rows) do
-    class = (class == "even" and "odd") or "even"
-    add('<tr class="' .. class .. '">')
-    for i,c in pairs(row) do
-      add('<td align="' .. html_align(aligns[i]) .. '">' .. c .. '</td>')
-    end
-    add('</tr>')
-  end
-  add('</table')
-  return table.concat(buffer,'\n')
-end
-
-function RawBlock(format, str)
-  if format == "html" then
-    return str
-  else
-    return ''
-  end
-end
-
-function Div(s, attr)
-  return "<div" .. attributes(attr) .. ">\n" .. s .. "</div>"
-end
-
--- The following code will produce runtime warnings when you haven't defined
--- all of the functions you need for the custom writer, so it's useful
--- to include when you're working on a writer.
-local meta = {}
-meta.__index =
-  function(_, key)
-    io.stderr:write(string.format("WARNING: Undefined function '%s'\n",key))
-    return function() return "" end
-  end
-setmetatable(_G, meta)
 
